@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Banknote, TrendingUp, ArrowUpRight, Receipt, AlertTriangle,
-  Clock, PackageX, Award, RefreshCw, Trophy,
+  Clock, PackageX, Award, RefreshCw, Trophy, Scissors,
 } from "lucide-react";
 import axios, { API } from "../../services/apiClient";
 import PeriodUnlockCard from "../../components/PeriodUnlockCard";
@@ -62,6 +62,8 @@ export default function AdminHome({ token, selectedEntity = "all", onNavigate })
   const lowStock = data?.low_stock || {};
   const board = data?.leaderboard_top || [];
   const overdue = data?.top_overdue || [];
+  const custom = data?.special_orders_waiting || {};
+  const customRows = custom.rows || [];
   // Jenis persetujuan terbanyak → dipakai teks bantu & tujuan klik KPI.
   const approvalItems = (data?.approvals?.items || []);
   const oldestWaiting = (data?.approvals?.oldest || []);
@@ -167,6 +169,66 @@ export default function AdminHome({ token, selectedEntity = "all", onNavigate })
             )}
           </div>
         )}
+
+        {/* PAPAN PO CUSTOM (2026-08-24) — dokumen yang salah-tundanya PALING MAHAL.
+            Kain custom sudah dipesan atas nama satu pelanggan; kalau keputusannya
+            menggantung, kainnya tak bisa dialihkan ke siapa pun. Di kartu "Paling Lama
+            Menunggu" dokumen ini bisa tidak pernah muncul (5 baris untuk 33 antrean),
+            jadi ia diberi papannya sendiri: SEMUA yang menunggu + UMUR TUNGGU-nya,
+            terurut dari yang paling lama. Sumber angkanya SATU dengan antrean di atas
+            (`approval_backlog_service`), jadi mustahil berbeda pendapat. */}
+        <div className="mt-4 rounded-xl border border-[#E4D9F5] bg-[#FBF9FF] p-4"
+          data-testid="admin-home-special-orders">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <Scissors size={15} className="text-[#6C3FD1]" />
+              <h3 className="text-[14px] font-bold">
+                Papan PO Custom — menunggu keputusan ({custom.count ?? 0})
+              </h3>
+            </div>
+            <button type="button" className="text-[12px] font-semibold text-[#6C3FD1]"
+              onClick={() => onNavigate && onNavigate(custom.view || "special-orders")}
+              data-testid="admin-home-goto-special-orders">Buka PO Custom →</button>
+          </div>
+          {loading ? (
+            <div className="h-16 rounded-lg bg-white/70 animate-pulse" />
+          ) : customRows.length === 0 ? (
+            <div className="h-16 flex items-center justify-center text-[13px] text-[#8E8E93]"
+              data-testid="admin-home-special-orders-empty">
+              Tidak ada PO custom yang menunggu keputusan 🎉
+            </div>
+          ) : (
+            <div className="grid gap-1.5" data-testid="admin-home-special-orders-list">
+              {customRows.map((r) => (
+                <button key={r.id} type="button"
+                  data-testid={`admin-home-special-order-${r.id}`}
+                  onClick={() => onNavigate && onNavigate(custom.view || "special-orders")}
+                  className="flex items-center gap-3 rounded-lg border border-[#EBE2FA] bg-white px-3 py-2 text-left hover:border-[#B79BEF] transition">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-semibold text-[#1C1C1E] truncate">
+                      {r.number} · {r.title}
+                    </p>
+                    <p className="text-[10.5px] text-[#8E8E93] truncate">
+                      {r.note || "PO custom"}{r.role ? ` · perlu ${r.role}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[12px] font-bold tabular-nums text-[#6C3FD1]">
+                    {fmtCur(r.amount)}
+                  </span>
+                  {/* Umur tunggu diberi warna karena "menunggu 12 hari" dan "menunggu
+                      hari ini" bukan pekerjaan yang sama mendesaknya. */}
+                  <span data-testid={`admin-home-special-order-age-${r.id}`}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                      r.days_waiting >= 7 ? "bg-[#FFE5E5] text-[#C62828]"
+                        : r.days_waiting >= 3 ? "bg-[#FFF1DB] text-[#B26A00]"
+                          : "bg-[#EFE9FB] text-[#5B33B8]"}`}>
+                    {r.days_waiting === 0 ? "hari ini" : `${r.days_waiting} hari`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           {/* Leaderboard */}

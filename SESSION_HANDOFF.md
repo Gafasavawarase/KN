@@ -1,10 +1,59 @@
 # SESSION HANDOFF — Kain Nusantara (WMS/ERP)
 
-> Diperbarui: **2026-08-24 (sesi lanjutan ke-2)** — **FAIL WARISAN DITUTUP & UTANG FASE N
+> Diperbarui: **2026-08-24 (sesi lanjutan ke-3)** — **PAPAN PO CUSTOM di beranda pemilik
+> (umur tunggu berlencana) + kotak notifikasi 6 peran DIUJI DI PERAMBAN**; pagar baru
+> INV-HOME-01 invarian H; `gate.sh --full` HIJAU 393 s.
+> Sebelumnya: 2026-08-24 (lanjutan ke-2) — **FAIL WARISAN DITUTUP & UTANG FASE N
 > LUNAS**: `gate.sh --full` HIJAU (419 s, receipt `memory/GATE_RECEIPT.md`), POC FASE G-8
 > `122 PASS · 0 FAIL`, POC FASE G-9 `119 PASS · 0 FAIL`,
 > `audit_md_erp_readiness` **SELESAI=96 · BELUM=0 · DRIFT=0** (sebelumnya 94/2/0).
 > Sebelumnya: 2026-08-24 (FASE I ditutup) · 2026-08-23 (FASE S) · 2026-08-21 (INV-REF-04).
+
+
+---
+## SESI 2026-08-24 (lanjutan ke-3) — **PAPAN PO CUSTOM DI BERANDA PEMILIK + UJI KOTAK NOTIFIKASI**
+
+### 1. Papan PO Custom (permintaan pemilik)
+Kain custom sudah dipesan atas nama SATU pelanggan; kalau keputusannya menggantung,
+kainnya tidak bisa dialihkan ke siapa pun. Di kartu "Paling Lama Menunggu" dokumen ini
+bisa **tidak pernah muncul** (5 baris untuk 33 antrean), jadi ia diberi papannya sendiri
+di Beranda pemilik: SEMUA yang menunggu + **umur tunggu** tiap dokumen, terurut dari yang
+paling lama, dengan lencana berwarna (≥7 hari merah · ≥3 hari kuning · lebih muda ungu).
+
+- **Sumbernya SATU dengan antrean** (`approval_backlog_service.queue_detail`) — papan baru
+  TIDAK melahirkan definisi keempat tentang "apa yang menunggu" (pelajaran INV-HOME-01:
+  tiga definisi berbeda pernah menghasilkan tiga angka berbeda di satu layar).
+- `DETAIL_META` menambah kolom yang hanya berarti untuk papan khusus (nilai rupiah,
+  keterangan barang, peran yang wewenangnya diminta) tanpa mengubah kartu lintas-antrean.
+- **Data demo diberi umur**: dokumen PO custom pending yang lahir dari `bootstrap` dulu
+  bertanggal `now`, jadi papannya SELALU berbunyi "hari ini" — fitur umur tunggu mustahil
+  dilihat atau diuji. Sekarang berumur 9 hari; **jumlah dokumen tidak berubah** (tetap 3).
+- **Pagar baru: INV-HOME-01 invarian H** (`verify_home_kpi.py`) — papan wajib sama dengan
+  baris antrean di layar yang sama, tidak boleh HAMPA selagi antreannya berisi, layarnya
+  wajib ada di `AppViewRouter`, dan tiap baris wajib bernomor & berumur tak negatif.
+  Kelima kasusnya dibuktikan bisa MEMERAH (self-test 11/11).
+
+### 2. Kotak notifikasi diuji di peramban (6 peran)
+Alamat yang sudah benar di backend akhirnya **dibuktikan terlihat benar di layar**:
+admin 20 pesan (18 "Untuk Anda" · 2 peran) · manajer 33 · finance **0 pesan stok** ·
+sales **0 PO custom** · gudang hanya SPK inspeksi · admin sales 1. **Nol pita "Umum"**
+untuk keempat jenis berpagar (`low_stock`, `ar_due_soon`, `special_order_approval`,
+`order_approval`). Filter jenis/keparahan/belum-dibaca + reset bekerja.
+
+### 3. JEBAKAN LINGKUNGAN (baru, wajib dibaca sebelum menguji layar)
+Frontend **tidak** dilayani dev-server: `yarn start` menjalankan `static_server.js` yang
+melayani **bundle produksi** di `frontend/build`. Perubahan di `frontend/src` TIDAK terlihat
+sampai `bash scripts/rebuild_frontend.sh` (~75 s) dijalankan. Selain itu `frontend/.env`
+ikut tertimpa saat repo di-rsync ke `/app` — bundle lama sempat memanggil URL backend milik
+pod LAMA dan peramban hanya menampilkan galat CORS (bukan bug aplikasi).
+
+### 4. Bukti
+| Alat | Hasil |
+|---|---|
+| `bash scripts/gate.sh --full` | **HIJAU 393 s** sesudah perubahan |
+| `verify_home_kpi.py --self-test` | **11/11 PASS** (5 kasus invarian H) |
+| `verify_home_kpi.py` (runtime) | **86 cek · 0 pelanggaran** · nol residu |
+| Agen uji (iteration_243) | **100% backend & frontend**, nol temuan |
 
 ---
 ## SESI 2026-08-24 (lanjutan ke-2) — **SATU FAIL, TIGA AKAR, DAN SATU JEBAKAN PENGUKURAN**

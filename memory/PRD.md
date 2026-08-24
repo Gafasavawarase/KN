@@ -430,3 +430,28 @@ G-9; pendekatan perbaikan residu diserahkan ke agen; repo publik; kredensial def
 - **P2** Login mengembalikan `token` (bukan `access_token`) — usul agen uji, murni DX.
 - **P2** Bersihkan alat bisect sementara (`scripts/_bisect_*.sh`, `scripts/_intip_settings.py`)
   atau pindahkan ke `scripts/_legacy/` bila tidak dipakai lagi.
+
+---
+
+## Sesi 2026-08-24 (lanjutan ke-3) — PAPAN PO CUSTOM + UJI LAYAR NOTIFIKASI
+
+Permintaan user (verbatim): (1) "Papan PO Custom: Tampilkan PO custom yang menunggu
+keputusan di beranda pemilik lengkap dengan umur tunggunya" · (2) "Layar Notifikasi: Uji
+kotak notifikasi tiap peran di peramban supaya alamat yang sudah benar terlihat benar juga
+di layar".
+
+| Pekerjaan | Berkas | Bukti |
+|---|---|---|
+| Papan PO Custom di Beranda pemilik: semua PO custom menunggu + umur tunggu berlencana warna, bisa diklik ke layar PO Custom, ter-scope badan usaha | `frontend/src/features/home/AdminHome.jsx` · `backend/services/home_service.py` · `backend/services/approval_backlog_service.py` (`queue_detail`, `DETAIL_META`) | agen uji iteration_243: panel tampil "(1)" · SORD-260824-0002 · Rp 43.500.000 · lencana **9 hari** · CV Kanda → papan kosong |
+| Data demo PO custom pending diberi umur 9 hari (jumlah dokumen tidak berubah) | `backend/bootstrap.py` | lencana umur akhirnya bisa dilihat & diuji |
+| Pagar baru INV-HOME-01 **invarian H** (papan == baris antrean · tak boleh hampa · layar bukan hantu · baris bernomor & umur tak negatif) | `scripts/guardrails/verify_home_kpi.py` | self-test **11/11 PASS** · runtime **86 cek · 0 pelanggaran** |
+| Kotak notifikasi 6 peran diuji di peramban | `frontend/src/components/NotificationCenter.jsx` (sudah ada) | finance 0 pesan stok · sales 0 PO custom · admin/manajer memuat PO custom · **nol pita "Umum"** untuk 4 jenis berpagar |
+
+**Gate:** `bash scripts/gate.sh --full` → **HIJAU 393 s**.
+
+### Backlog terprioritas berikutnya
+- **P1** `INV-GL-DRIFT` (`ent_kanda` Δ900.000) — lihat sesi lanjutan ke-2 §4.
+- **P2** Papan PO Custom baru ada di Beranda **admin**; Beranda Manajer belum memilikinya.
+- **P2** Lencana umur tunggu bisa dipakai ulang untuk antrean lain yang mahal bila menunggu
+  (kontrabon bersengketa, retur antar-PT).
+- **P2** Bersihkan alat bisect sementara (`scripts/_bisect_*.sh`, `scripts/_intip_settings.py`).

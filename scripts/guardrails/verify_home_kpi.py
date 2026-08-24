@@ -240,6 +240,38 @@ def check_payload(g, role, payload, expected_rows, known_views):
                   f"negatif ({o.get('number')!r} · {o.get('days_waiting')}) — pengingat "
                   f"harian akan menyebut sesuatu yang tak bisa dicari orang.")
 
+    # H — PAPAN PO CUSTOM (2026-08-24). Papan khusus di beranda pemilik punya angka
+    # SENDIRI (`special_orders_waiting.count`); begitu ia dihitung dengan cara lain,
+    # beranda kembali punya dua pendapat di satu layar — kelas bug yang persis sama
+    # dengan `approval_requests` yang selalu 0. Karena itu: (1) jumlahnya WAJIB sama
+    # dengan baris antrean `special_order` di layar yang sama, (2) barisnya tak boleh
+    # menunjuk layar hantu, (3) tiap baris wajib bernomor & berumur tak negatif, dan
+    # (4) papan tak boleh KOSONG selagi antreannya berisi (papan hampa = pemilik
+    # menyimpulkan tidak ada pekerjaan).
+    papan = payload.get("special_orders_waiting")
+    if isinstance(papan, dict):
+        antrean_so = by_key.get("special_order", 0)
+        g.bump()
+        if int(papan.get("count") or 0) != antrean_so:
+            g.add(f"{role}: Papan PO Custom berbunyi {papan.get('count')} sementara baris "
+                  f"antrean `special_order` di layar yang sama {antrean_so} — dua angka "
+                  f"berbeda untuk satu kenyataan.")
+        g.bump()
+        if papan.get("view") and papan["view"] not in known_views:
+            g.add(f"{role}: Papan PO Custom menunjuk layar `{papan.get('view')}` yang "
+                  f"tidak ada di AppViewRouter.")
+        baris = papan.get("rows") or []
+        g.bump()
+        if antrean_so > 0 and not baris:
+            g.add(f"{role}: ADA {antrean_so} PO custom menunggu keputusan tetapi Papan PO "
+                  f"Custom mengirim 0 baris — papan hampa membuat pemilik menyimpulkan "
+                  f"tidak ada pekerjaan.")
+        for r in baris:
+            g.bump()
+            if not r.get("number") or int(r.get("days_waiting", -1)) < 0:
+                g.add(f"{role}: baris Papan PO Custom tanpa nomor dokumen atau berumur "
+                      f"negatif ({r.get('number')!r} · {r.get('days_waiting')}).")
+
 
 def self_test():
     """Bukti-merah: penjaga ini harus MENUDUH keempat pelanggaran & meloloskan yang benar."""
@@ -281,6 +313,47 @@ def self_test():
           "approvals": {"total": 4, "all_items": [
               {"key": "sales_order", "count": 1, "view": "layar-hantu"},
               {"key": "purchase_order", "count": 3, "view": "purchase-approval"}]}}, 1),
+        # ── H — PAPAN PO CUSTOM (2026-08-24) ────────────────────────────────────
+        ("H: Papan PO Custom sehat → hijau",
+         {"approvals_pending": 4,
+          "approvals": {"total": 4, "all_items": [
+              {"key": "sales_order", "count": 1, "view": "approval-inbox"},
+              {"key": "purchase_order", "count": 3, "view": "purchase-approval"},
+              {"key": "special_order", "count": 2, "view": "approval-inbox"}]},
+          "special_orders_waiting": {"count": 2, "view": "approval-inbox", "rows": [
+              {"number": "SORD-1", "days_waiting": 9},
+              {"number": "SORD-2", "days_waiting": 0}]}}, 0),
+        ("H: papan berbunyi lain dari baris antrean di layar yang sama → merah",
+         {"approvals_pending": 4,
+          "approvals": {"total": 4, "all_items": [
+              {"key": "sales_order", "count": 1, "view": "approval-inbox"},
+              {"key": "purchase_order", "count": 3, "view": "purchase-approval"},
+              {"key": "special_order", "count": 2, "view": "approval-inbox"}]},
+          "special_orders_waiting": {"count": 1, "view": "approval-inbox", "rows": [
+              {"number": "SORD-1", "days_waiting": 9}]}}, 1),
+        ("H: antrean berisi tetapi papan hampa → merah",
+         {"approvals_pending": 4,
+          "approvals": {"total": 4, "all_items": [
+              {"key": "sales_order", "count": 1, "view": "approval-inbox"},
+              {"key": "purchase_order", "count": 3, "view": "purchase-approval"},
+              {"key": "special_order", "count": 2, "view": "approval-inbox"}]},
+          "special_orders_waiting": {"count": 2, "view": "approval-inbox", "rows": []}}, 1),
+        ("H: baris papan tanpa nomor / umur negatif → merah",
+         {"approvals_pending": 4,
+          "approvals": {"total": 4, "all_items": [
+              {"key": "sales_order", "count": 1, "view": "approval-inbox"},
+              {"key": "purchase_order", "count": 3, "view": "purchase-approval"},
+              {"key": "special_order", "count": 1, "view": "approval-inbox"}]},
+          "special_orders_waiting": {"count": 1, "view": "approval-inbox", "rows": [
+              {"number": "", "days_waiting": -3}]}}, 1),
+        ("H: papan menunjuk layar hantu → merah",
+         {"approvals_pending": 4,
+          "approvals": {"total": 4, "all_items": [
+              {"key": "sales_order", "count": 1, "view": "approval-inbox"},
+              {"key": "purchase_order", "count": 3, "view": "purchase-approval"},
+              {"key": "special_order", "count": 1, "view": "approval-inbox"}]},
+          "special_orders_waiting": {"count": 1, "view": "papan-hantu", "rows": [
+              {"number": "SORD-1", "days_waiting": 2}]}}, 1),
     ]
     gagal = 0
     print(f"{B}== SELF-TEST INV-HOME-01 (penjaga KPI harus bisa MEMERAH) =={X}")

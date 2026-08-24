@@ -264,6 +264,13 @@ async def admin_home(entity_id: Optional[str] = None) -> Dict[str, Any]:
     # (dulu: satu angka dari koleksi generik yang tak pernah terisi → selalu 0).
     approvals = await approval_backlog(entity_id)
 
+    # PAPAN PO CUSTOM — kain yang dipesan khusus tidak bisa dijual ke pelanggan lain,
+    # jadi terlambat memutuskannya paling mahal. Di kartu "Paling Lama Menunggu"
+    # dokumen ini bisa TIDAK PERNAH muncul (5 baris, dicampur 33 antrean), karena itu
+    # ia punya papannya sendiri — lengkap dengan UMUR TUNGGU tiap dokumen.
+    from services import approval_backlog_service as _abl
+    special_orders_waiting = await _abl.queue_detail("special_order", entity_id, limit=10)
+
     reorder = await reorder_suggestions(entity_id)
     reorder_items = reorder.get("items", [])
 
@@ -283,6 +290,7 @@ async def admin_home(entity_id: Optional[str] = None) -> Dict[str, Any]:
         "ar": {"outstanding": ar_total, "overdue": overdue_total},
         "approvals_pending": approvals["total"],
         "approvals": approvals,
+        "special_orders_waiting": special_orders_waiting,
         "low_stock": {"count": len(reorder_items), "items": reorder_items[:8]},
         "incentive_payout": round(payout, 2),
         "leaderboard_top": board[:5],

@@ -209,8 +209,8 @@ AGING_META: Dict[str, Dict[str, List[str]]] = {
                  "title": ["title", "design_title"]},
     "rnd_sample": {"since": ["sent_at", "created_at"], "number": ["number"],
                    "title": ["title", "spec_number"]},
-    "special_order": {"since": ["submitted_at", "created_at"], "number": ["number"],
-                      "title": ["customer_name"]},
+    "special_order": {"since": ["submitted_at", "approval_requested_at", "created_at"],
+                      "number": ["number"], "title": ["customer_name"]},
     # ── FASE F-6 — antrean baru (field nomor/judul/tanggal DIVERIFIKASI dari dokumen
     # nyata di basis data & dari fungsi pembuatnya, bukan ditebak). Nomor yang salah
     # nama field berarti pengingat harian menyebut sesuatu yang tak bisa dicari orang.
@@ -330,6 +330,72 @@ async def oldest(entity_id: Optional[Any] = None, limit: int = 8) -> List[Dict[s
             })
     rows.sort(key=lambda r: (-r["days_waiting"], r["since"] or ""))
     return rows[:limit]
+
+
+#: Kolom TAMBAHAN yang hanya berarti untuk papan khusus satu antrean (nilai rupiah,
+#: keterangan barang, peran yang wewenangnya diminta). Dipisah dari `AGING_META` supaya
+#: kartu "Paling Lama Menunggu" — yang harus seragam lintas 33 antrean — tidak berubah.
+#: Titik berarti bersarang (`custom_item.description`).
+DETAIL_META: Dict[str, Dict[str, List[str]]] = {
+    "special_order": {
+        "amount": ["total_amount"],
+        "note": ["custom_item.description", "notes"],
+        "role": ["required_approval_role", "approval_role"],
+    },
+}
+
+
+def _pick_path(doc: Dict[str, Any], fields: List[str], default: Any = "") -> Any:
+    """Seperti `_pick`, tetapi mengerti jalur bersarang `a.b.c` dan menjaga tipe angka."""
+    for f in fields:
+        cur: Any = doc
+        for part in f.split("."):
+            cur = cur.get(part) if isinstance(cur, dict) else None
+            if cur is None:
+                break
+        if cur not in (None, "", [], {}):
+            return cur
+    return default
+
+
+async def queue_detail(key: str, entity_id: Optional[Any] = None,
+                       limit: int = 12) -> Dict[str, Any]:
+    """Isi SATU antrean beserta umur tunggu tiap dokumen — untuk papan khusus.
+
+    KENAPA ADA: kartu "Paling Lama Menunggu" mencampur 33 antrean dan hanya memuat 5
+    baris, jadi sebuah PO custom yang menunggu bisa TIDAK PERNAH terlihat di beranda
+    hanya karena antrean lain lebih tua. Untuk dokumen yang salah-tundanya paling
+    mahal (kain dipesan khusus — tak bisa dijual ke pelanggan lain) pemilik butuh
+    papannya sendiri: semua yang menunggu, terurut dari yang paling lama.
+
+    Definisi "menunggu" & umur tunggunya TETAP dibaca dari `QUEUES`/`AGING_META` di
+    modul ini — papan baru tidak boleh melahirkan definisi ke-empat (INV-HOME-01).
+    """
+    row = next((q for q in QUEUES if q[0] == key), None)
+    if row is None:
+        return {"key": key, "count": 0, "rows": []}
+    _, label, view, coll, query = row
+    meta = AGING_META.get(key) or {"since": ["created_at"], "number": ["number"],
+                                   "title": ["title"]}
+    extra = DETAIL_META.get(key, {})
+    scope = _scope(entity_id)
+    count = await db[coll].count_documents({**scope, **query})
+    docs = await (db[coll].find({**scope, **query}, {"_id": 0})
+                 .sort([(meta["since"][0], 1)]).limit(max(1, limit)).to_list(limit))
+    rows = []
+    for d in docs:
+        since = _pick(d, meta["since"])
+        rows.append({
+            "id": d.get("id", ""), "number": _pick(d, meta["number"], d.get("id", "")),
+            "title": _pick(d, meta["title"], "—"),
+            "amount": float(_pick_path(d, extra.get("amount", []), 0) or 0),
+            "note": str(_pick_path(d, extra.get("note", []), "") or ""),
+            "role": str(_pick_path(d, extra.get("role", []), "") or ""),
+            "entity_id": d.get("entity_id", ""),
+            "since": since, "days_waiting": days_waiting(since),
+        })
+    rows.sort(key=lambda r: (-r["days_waiting"], r["since"] or ""))
+    return {"key": key, "label": label, "view": view, "count": int(count), "rows": rows}
 
 
 async def backlog(entity_id: Optional[str] = None,

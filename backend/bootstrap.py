@@ -1289,6 +1289,7 @@ async def seed_sales_extras_foundation() -> None:
     """Seed contoh Special Order (OD) & Sales Return (idempotent) agar UI tidak kosong."""
     from services.special_order_service import generate_special_order_number, APPROVAL_THRESHOLD
     from services.return_service import next_return_number
+    from datetime import datetime, timedelta, timezone
     entity_id = PRIMARY_ENTITY_ID
     now = now_iso()
     # --- Special Orders (OD) ---
@@ -1297,13 +1298,22 @@ async def seed_sales_extras_foundation() -> None:
         if cust:
             addr = (cust.get("addresses") or [{}])[0]
             samples = [
-                {"desc": "Kain jacquard custom motif logo perusahaan", "qty": 500, "unit": "yard", "price": 85000, "status": "draft"},
-                {"desc": "Sutra dobby warna Pantone khusus (indent 6 minggu)", "qty": 300, "unit": "yard", "price": 145000, "status": "pending_approval"},
-                {"desc": "Katun premium bordir custom seragam", "qty": 1200, "unit": "yard", "price": 42000, "status": "in_production"},
+                {"desc": "Kain jacquard custom motif logo perusahaan", "qty": 500, "unit": "yard", "price": 85000, "status": "draft", "umur_hari": 0},
+                {"desc": "Sutra dobby warna Pantone khusus (indent 6 minggu)", "qty": 300, "unit": "yard", "price": 145000, "status": "pending_approval", "umur_hari": 9},
+                {"desc": "Katun premium bordir custom seragam", "qty": 1200, "unit": "yard", "price": 42000, "status": "in_production", "umur_hari": 0},
             ]
             for s in samples:
                 total = s["qty"] * s["price"]
                 number = await generate_special_order_number()
+                # UMUR TUNGGU harus TERLIHAT di data demo. Dulu ketiganya bertanggal
+                # `now`, jadi Papan PO Custom di beranda pemilik selalu berbunyi
+                # "hari ini" dan tak seorang pun bisa melihat — atau menguji — bahwa
+                # dokumen yang menggantung 9 hari ditandai merah. Kain custom tidak
+                # bisa dijual ke pelanggan lain; justru umur tunggu itulah kabar
+                # terpentingnya. Jumlah dokumen TIDAK berubah (tetap 3).
+                dibuat = (now if not s["umur_hari"] else
+                          (datetime.now(timezone.utc)
+                           - timedelta(days=s["umur_hari"])).isoformat())
                 await db.special_orders.insert_one({
                     "id": new_id("sord"), "number": number, "status": s["status"],
                     "type": "special_order", "customer_id": cust["id"], "customer_name": cust["name"],
@@ -1314,8 +1324,8 @@ async def seed_sales_extras_foundation() -> None:
                     "total_amount": total, "requires_approval": total > APPROVAL_THRESHOLD,
                     "approval_threshold": APPROVAL_THRESHOLD, "expected_delivery": "",
                     "entity_id": entity_id, "notes": "Contoh data demo",
-                    "status_history": [{"status": s["status"], "timestamp": now, "user": "system-seed"}],
-                    "created_at": now, "created_by": "system-seed", "updated_at": now,
+                    "status_history": [{"status": s["status"], "timestamp": dibuat, "user": "system-seed"}],
+                    "created_at": dibuat, "created_by": "system-seed", "updated_at": dibuat,
                 })
     # --- Sales Returns ---
     if await db.sales_returns.count_documents({"entity_id": entity_id}) == 0:
