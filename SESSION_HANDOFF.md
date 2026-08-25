@@ -47,7 +47,21 @@ sampai `bash scripts/rebuild_frontend.sh` (~75 s) dijalankan. Selain itu `fronte
 ikut tertimpa saat repo di-rsync ke `/app` — bundle lama sempat memanggil URL backend milik
 pod LAMA dan peramban hanya menampilkan galat CORS (bukan bug aplikasi).
 
-### 4. Bukti
+### 4. AUDIT MANDIRI (permintaan pemilik) → `HANDOFF_AUDIT_SESI_2026-08-24.md`
+Pekerjaan sesi ini diaudit sendiri untuk cacat logika · SSOT salah · duplikasi.
+**14 temuan, dan NOL di antaranya tertangkap gate hari ini** (justru itu poinnya).
+Empat yang P1:
+* **A1** dua definisi pesan untuk satu peristiwa "PO custom menunggu" (endpoint & job) —
+  isinya sudah berbeda hari ini;
+* **A2** dua sistem menagih dokumen yang SAMA setiap hari (`approval_reminder` +
+  job baru) — kotak yang isinya berulang berhenti dibaca;
+* **B1** `AGING_META["special_order"].since` menyebut `submitted_at` /
+  `approval_requested_at` yang **tidak pernah ditulis satu jalur pun** → umur tunggu
+  selalu jatuh ke `created_at` (dan pengurutan papan ikut acak — B3);
+* **D1** invarian H bisa **dimatikan dengan menghapus datanya** (`isinstance` → skip).
+Perbaikannya dikerjakan sesi berikutnya sesuai urutan di berkas auditnya.
+
+### 5. Bukti
 | Alat | Hasil |
 |---|---|
 | `bash scripts/gate.sh --full` | **HIJAU 393 s** sesudah perubahan |

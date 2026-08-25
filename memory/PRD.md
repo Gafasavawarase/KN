@@ -449,7 +449,16 @@ di layar".
 
 **Gate:** `bash scripts/gate.sh --full` → **HIJAU 393 s**.
 
+### AUDIT MANDIRI atas pekerjaan sesi ini → `HANDOFF_AUDIT_SESI_2026-08-24.md`
+Permintaan pemilik: audit sendiri hasil sesi ini (cacat logika · SSOT salah · duplikasi)
+dan tulis handoff, perbaikannya sesi depan. **14 temuan, nol yang tertangkap gate hari ini**:
+4× P1 (`A1` dua definisi pesan · `A2` dua sistem menagih dokumen sama tiap hari ·
+`B1` `AGING_META.since` menyebut field yang tak pernah ditulis siapa pun · `D1` invarian H
+bisa dimatikan dengan menghapus datanya), 8× P2, 1× P3. Urutan kerja & usul perbaikan per
+temuan ada di berkasnya.
+
 ### Backlog terprioritas berikutnya
+- **P1** Kerjakan temuan audit `HANDOFF_AUDIT_SESI_2026-08-24.md` (urutan §"Urutan kerja").
 - **P1** `INV-GL-DRIFT` (`ent_kanda` Δ900.000) — lihat sesi lanjutan ke-2 §4.
 - **P2** Papan PO Custom baru ada di Beranda **admin**; Beranda Manajer belum memilikinya.
 - **P2** Lencana umur tunggu bisa dipakai ulang untuk antrean lain yang mahal bila menunggu
